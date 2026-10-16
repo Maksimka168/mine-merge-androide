@@ -1,17 +1,13 @@
 name: Build APK
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,15 +24,17 @@ jobs:
             libnss3-dev libsqlite3-dev libreadline-dev libbz2-dev \
             pkg-config libopenblas-dev libsdl2-dev libsdl2-image-dev \
             libsdl2-mixer-dev libsdl2-ttf-dev libfreetype6-dev \
-            libportmidi-dev libjpeg-dev libtiff5-dev libwebp-dev
+            libportmidi-dev libjpeg-dev libtiff5-dev libwebp-dev \
+            openjdk-11-jdk
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Android SDK & NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
-          packages: 'platforms;android-30 build-tools;30.0.3 platform-tools'
-          accept-android-sdk-licenses: 'true'
+          ndk-version: r23b
+          add-to-path: false
 
-      - name: Install Buildozer and Cython
+      - name: Install Buildozer
         run: pip install buildozer cython
 
       - name: Initialize Buildozer
@@ -50,11 +48,14 @@ jobs:
           sed -i 's/fullscreen = .*/fullscreen = 0/' buildozer.spec
           sed -i 's/android.api =.*/android.api = 30/' buildozer.spec
           sed -i 's/android.minapi =.*/android.minapi = 21/' buildozer.spec
+          # Указываем пути к SDK и NDK
+          echo "android.sdk_path = /usr/local/lib/android/sdk" >> buildozer.spec
+          echo "android.ndk_path = ${{ steps.setup-ndk.outputs.ndk-path }}" >> buildozer.spec
 
       - name: Build APK
         run: buildozer android debug 2>&1
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MineMerge-APK
